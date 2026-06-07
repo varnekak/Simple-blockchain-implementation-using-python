@@ -3,9 +3,22 @@ import json
 from time import time 
 from uuid import uuid4
 from flask import Flask
+from textwrap import dedent
 
+
+# instatiate our Node
 app = Flask(__name__)
+
+# generate a globallay unique adress for this node 
+node_identifier= str(uuid4()).replace('-','')
+
+# instantiate a Blockchain
 blockchain =  Blockchain()
+
+@app.route('/mine',methods=['GET'])
+def mine():
+     return "We ll mine a new block"
+
 
 @app.route('/chain', methods=['GET'])
 def full_chain():
