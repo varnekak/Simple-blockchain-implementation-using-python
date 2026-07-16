@@ -2,7 +2,10 @@
 #Remember that a blockchain is an immutable, sequential chain of records called Blocks. They can contain transactions, files or any data you like, really. But the important thing is that they’re chained together using hashes. 
 import hashlib
 import json
-from time import time    
+from time import time 
+from textwrap import dedent 
+from uuid import uuid4
+from flask import Flask   #Flask is just a Python library that makes creating servers easy.
 
 
 class Blockchain(object): #class is responsible for managing the chain. It will store transactions and have some helper methods for adding new blocks to the chain
@@ -62,7 +65,63 @@ class Blockchain(object): #class is responsible for managing the chain. It will 
     def last_block(self):
         #returns the last block in the chain 
        return self.chain[-1]
-  """At this point, the idea of a chain should be apparent—each new block contains within itself,
-    the hash of the previous Block.
- This is crucial because it’s what gives blockchains immutability: If an attacker corrupted an earlier Block in the chain 
- then all subsequent blocks will contain incorrect hashes."""
+           """At this point, the idea of a chain should be apparent—each new block contains within itself,
+               the hash of the previous Block.
+             This is crucial because it’s what gives blockchains immutability: If an attacker corrupted an earlier Block in the chain 
+                then all subsequent blocks will contain incorrect hashes.
+            """
+
+            """ 
+                       proof of work A Proof of Work algorithm (PoW) is how new Blocks are created or mined on the blockchain.
+                        The goal of PoW is to discover a number which solves a problem. 
+                        The number must be difficult to find but easy to verify—computationally speaking—by anyone on the network. 
+                         This is the core idea behind Proof of Work.
+            """
+    def proof_of_work(self, last_proof):
+    """
+     Simple Proof of Work Algorithm:
+         - Find a number p' such that hash(pp') contains leading 4 zeroes, where p is the previous p'
+         - p is the previous proof, and p' is the new proof
+        :param last_proof: <int>
+        :return: <int>
+    """
+       proof = 0 
+       while self.valid_proof(last_proof, proof) is False:#keep looking while the proof is NOTVALID
+           proof += 1 
+        return proof 
+    
+    @staticmethod
+    def valid_proof(last_proof, proof):
+        """
+          Validates the Proof: Does hash(last_proof, proof) contain 4 leading zeroes?
+        :param last_proof: <int> Previous Proof
+        :param proof: <int> Current Proof
+        :return: <bool> True if correct, False if not.
+        
+        """
+        guess = f'{last_proof}{proof}'.encode()
+        # we combine not sum the lastproof and current proof as a string and
+        # and convert them to bytes because SHA-256 cannot hash a normal string hence we use encode 
+        guess_hash = hashlib.sha256(guess).hexadigest()
+        # hexadigest returns the result as a readable hexadecimal 
+        return guess_hash[:4] == "0000"
+        # checks if the first 4 digits start with 0000
+# Instantiate our node 
+app = Flask(__name__) # creates a flask application 
+
+# Generate a globbaly unique address for this node 
+node_identifier = str(uuid4()).replace('-','')
+
+# intantiate the blockchain 
+blockchain =  Blockchain()
+
+@app.route('/mine', methods = ['GET '])
+def mine():
+    return "we'll mine a new block"
+
+@app.route('/transactions/new', methods=['POST'])
+def new_transaction():
+    return "We 'll add a new transaction"
+
+@app.route('/chain', methods =['GET'])
+def full_chain():
