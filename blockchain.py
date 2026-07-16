@@ -5,7 +5,7 @@ import json
 from time import time 
 from textwrap import dedent 
 from uuid import uuid4
-from flask import Flask   #Flask is just a Python library that makes creating servers easy.
+from flask import Flask,jsonify, request   #Flask is just a Python library that makes creating servers easy.
 
 
 class Blockchain(object): #class is responsible for managing the chain. It will store transactions and have some helper methods for adding new blocks to the chain
@@ -117,11 +117,45 @@ blockchain =  Blockchain()
 
 @app.route('/mine', methods = ['GET '])
 def mine():
-    return "we'll mine a new block"
+    # we run the proof of work algorithms to get the next proof
+    last_block = blockchain.last_block
+    last_proof = last_block['proof']
+    proof = blockchain.proof_of_work(last_proof)
+
+    # we  must recive a reward for finding the proof
+    # the sender is "0" to signify that this node has mined a new coin
+
+    blockchain.new_transaction(
+        sender = "0",
+        recipient = node_identifier,
+        amount = 1,
+    )
+    # forge the new block by adding it to the chain
+    previous_hash = blockchain.hash(last_block)
+    block = blockchain.new_block(proof, previous_hash)
+
+    response = {
+        'message': "New Block Forged "
+    }
 
 @app.route('/transactions/new', methods=['POST'])
 def new_transaction():
-    return "We 'll add a new transaction"
+    values = request.get_json()
+    # check the required field 
+    required = ['sender','recipient','amount']
+    if not all (k in values for k in required):
+        return 'Missing values',400
+    #create a new transaction 
+    index = Blockchain.new_transaction(values['sender'], values['recepient'], values['amount'])
+    response = {'mesage': f'Transaction will be added to block {index}'}
+    return jsonify(response),201
 
 @app.route('/chain', methods =['GET'])
 def full_chain():
+    response = {
+        'chain': Blockchain.chain,
+        'length': len(blockchain.chain),
+    }
+    return jsonify(response),200
+if __name__ == 'main':
+    app.run(host = '0.0.0.0',port=5000)
