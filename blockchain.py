@@ -146,16 +146,19 @@ def new_transaction():
     if not all (k in values for k in required):
         return 'Missing values',400
     #create a new transaction 
-    index = Blockchain.new_transaction(values['sender'], values['recepient'], values['amount'])
-    response = {'mesage': f'Transaction will be added to block {index}'}
+    index = blockchain.new_transaction(values['sender'], values['recipient'], values['amount'])
+    response = {'message': f'Transaction will be added to block {index}'}
     return jsonify(response),201
 
 @app.route('/chain', methods =['GET'])
 def full_chain():
     response = {
-        'chain': Blockchain.chain,
+        'chain': blockchain.chain,
         'length': len(blockchain.chain),
     }
-    return jsonify(response),200
+    return jsonify(response),200 # HTTP status code 200 means success
+ #flask converts the python dictionary into JSON 
+   # it converts to json because browsers, mobile apps, and other blockchain nodes all understand JSON.
 if __name__ == 'main':
-    app.run(host = '0.0.0.0',port=5000)
+    app.run(host = '0.0.0.0',port=5000) # starts the server 
+    # 5000 is the port 
