@@ -6,43 +6,44 @@ from time import time
 from textwrap import dedent 
 from uuid import uuid4
 from flask import Flask,jsonify, request   #Flask is just a Python library that makes creating servers easy.
-
+import request
 
 class Blockchain(object): #class is responsible for managing the chain. It will store transactions and have some helper methods for adding new blocks to the chain
     def __init__(self):
-       self.chain =[]
-       self.current_transactions =[]
+        self.chain =[]
+        self.current_transactions =[]
+        self.nodes = set()
 
-       # Create the genesis block 
-       self.new_block(previous_hash=1, proof=100)
-     
+        # Create the genesis block 
+        self.new_block(previous_hash=1, proof=100)
+    
+    def register_node(self, address):
+        parsed_url = urlparse(address)
+        self.nodes.add(parsed_url.netloc)
+
     def new_block(self, proof, previous_hash=None):
-        #creates a new block and adds it to the chain
-         """
-        Create a new Block in the Blockchain
-        :param proof: <int> The proof given by the Proof of Work algorithm
-        :param previous_hash: (Optional) <str> Hash of previous Block
-        :return: <dict> New Block
-        """
         block = {
-             'index': len(self.chain)+1,
-             'timestamp': time(),
-             'transactions': self.current_transactions,
-             'proof': proof,
-             'previous_hash': previous_ha
-         }
-        # reset the current lists of transactions
-        self.current_transaction = []
+            'index':len(self.chain)+1,
+            'timestamp':time(),
+            'transactions': self.current_transactions,
+            'proof': proof,
+            'previous_hash': previous_hash,
+        }
+
+        self.current_transactions = []
         self.chain.append(block)
-        return block 
+        return block
     
     def new_transaction(self,sender, recipient, amount):
         #adds a new transaction to the list of transactions 
-        """Creates a new transaction to go into the next mined block
+        """
+        Creates a new transaction to go into the next mined block
         :param sender: <str> Address of the Sender
        :param recipient: <str> Address of the Recipient
        :param amount: <int> Amount
-       :return: <int> The index of the Block that will hold this transaction"""
+       :return: <int> The index of the Block that will hold this transaction
+
+       """
         self.current_transactions.append({
             'sender':sender,    
             'recipient': recipient,
@@ -50,45 +51,48 @@ class Blockchain(object): #class is responsible for managing the chain. It will 
         })
         return self.last_block['index'] + 1 
     
-    def proof_of_work(self, last_proof):
+
         
     @staticmethod
     def hash(block):
         #Hashes a block 
-         """
+        """
         Creates a SHA-256 hash of a Block
         :param block: <dict> Block
         :return: <str>
         """
+         # we must make sure that the dictionary is ordered,
+         # or we ll have inconsitent hash 
+        block_string = json.dumps(block, sort_keys =  True).encode()
+        return hashlib.sha256(block_string).hexdigest()
     
     @property 
     def last_block(self):
-        #returns the last block in the chain 
+       """returns the last block in the chain """
        return self.chain[-1]
-           """At this point, the idea of a chain should be apparent—each new block contains within itself,
-               the hash of the previous Block.
-             This is crucial because it’s what gives blockchains immutability: If an attacker corrupted an earlier Block in the chain 
-                then all subsequent blocks will contain incorrect hashes.
-            """
+          #"At this point, the idea of a chain should be apparent—each new block contains within itself,
+           #This is crucial because it’s what gives blockchains immutability: If an attacker corrupted an earlier Block in the chain 
+           #then all subsequent blocks will contain incorrect hashes.
+        
 
-            """ 
-                       proof of work A Proof of Work algorithm (PoW) is how new Blocks are created or mined on the blockchain.
-                        The goal of PoW is to discover a number which solves a problem. 
-                        The number must be difficult to find but easy to verify—computationally speaking—by anyone on the network. 
-                         This is the core idea behind Proof of Work.
-            """
+ 
+#                       proof of work A Proof of Work algorithm (PoW) is how new Blocks are created or mined on the blockchain.
+ #                       The goal of PoW is to discover a number which solves a problem. 
+  #                      The number must be difficult to find but easy to verify—computationally speaking—by anyone on the network. 
+   #                      This is the core idea behind Proof of Work.
+    
     def proof_of_work(self, last_proof):
-    """
+      """
      Simple Proof of Work Algorithm:
          - Find a number p' such that hash(pp') contains leading 4 zeroes, where p is the previous p'
          - p is the previous proof, and p' is the new proof
         :param last_proof: <int>
         :return: <int>
-    """
-       proof = 0 
-       while self.valid_proof(last_proof, proof) is False:#keep looking while the proof is NOTVALID
+      """
+      proof = 0 
+      while self.valid_proof(last_proof, proof) is False:#keep looking while the proof is NOTVALID
            proof += 1 
-        return proof 
+      return proof 
     
     @staticmethod
     def valid_proof(last_proof, proof):
@@ -102,10 +106,12 @@ class Blockchain(object): #class is responsible for managing the chain. It will 
         guess = f'{last_proof}{proof}'.encode()
         # we combine not sum the lastproof and current proof as a string and
         # and convert them to bytes because SHA-256 cannot hash a normal string hence we use encode 
-        guess_hash = hashlib.sha256(guess).hexadigest()
+        guess_hash = hashlib.sha256(guess).hexdigest()
         # hexadigest returns the result as a readable hexadecimal 
         return guess_hash[:4] == "0000"
         # checks if the first 4 digits start with 0000
+
+
 # Instantiate our node 
 app = Flask(__name__) # creates a flask application 
 
@@ -115,7 +121,7 @@ node_identifier = str(uuid4()).replace('-','')
 # intantiate the blockchain 
 blockchain =  Blockchain()
 
-@app.route('/mine', methods = ['GET '])
+@app.route('/mine', methods = ['GET'])
 def mine():
     # we run the proof of work algorithms to get the next proof
     last_block = blockchain.last_block
@@ -135,16 +141,25 @@ def mine():
     block = blockchain.new_block(proof, previous_hash)
 
     response = {
-        'message': "New Block Forged "
+        'message': "New Block Forged ",
+        'index': block['index'],
+        'transactions':block['transactions'],
+        'proof':block['proof'],
+        'previous_hash': block['previous_hash'],
     }
+    return jsonify(response), 200
 
-@app.route('/transactions/new', methods=['POST'])
+@app.route('/transactions/new', methods=['POST']) # decorators?
+# "Whenever someone sends a POST request to /transactions/new, execute the function below."
 def new_transaction():
-    values = request.get_json()
+    #Over the internet, the client sends JSON
+    values = request.get_json() # it reads the JSON and converts it into a Python dictionary, so now u can do things to the dictionary.
+   
     # check the required field 
     required = ['sender','recipient','amount']
     if not all (k in values for k in required):
-        return 'Missing values',400
+        return 'Missing values', 400 # 400 is status code for bad request 
+    
     #create a new transaction 
     index = blockchain.new_transaction(values['sender'], values['recipient'], values['amount'])
     response = {'message': f'Transaction will be added to block {index}'}
@@ -159,6 +174,6 @@ def full_chain():
     return jsonify(response),200 # HTTP status code 200 means success
  #flask converts the python dictionary into JSON 
    # it converts to json because browsers, mobile apps, and other blockchain nodes all understand JSON.
-if __name__ == 'main':
+if __name__ == '__main__':
     app.run(host = '0.0.0.0',port=5000) # starts the server 
     # 5000 is the port 
